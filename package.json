@@ -1,0 +1,41 @@
+{
+  "name": "querymind",
+  "version": "1.0.0",
+  "description": "AI SQL Optimizer and Database Assistant",
+  "main": "electron.js",
+  "author": "JP",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "oracledb": "^6.5.1"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.querymind.desktop",
+    "productName": "QueryMind",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "artifactName": "QueryMind-Setup.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

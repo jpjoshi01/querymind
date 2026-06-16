@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QueryMind - AI SQL & NoSQL Optimizer</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+  :root {
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f5f5f4;
+    --color-background-tertiary: #f0efed;
+    --color-text-primary: #1a1a1a;
+    --color-text-secondary: #6b6b6b;
+    --color-text-tertiary: #9b9b9b;
+    --color-border-tertiary: rgba(0,0,0,0.12);
+    --color-border-secondary: rgba(0,0,0,0.2);
+    --color-border-primary: rgba(0,0,0,0.3);
+    --color-background-info: #E6F1FB;
+    --color-text-info: #185FA5;
+    --color-background-success: #EAF3DE;
+    --color-text-success: #3B6D11;
+    --color-background-warning: #FAEEDA;
+    --color-text-warning: #854F0B;
+    --color-background-danger: #FCEBEB;
+    --color-text-danger: #A32D2D;
+    --font-sans: system-ui, -apple-system, sans-serif;
+    --font-mono: 'Courier New', monospace;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+    --border-radius-xl: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background-primary: #1c1c1e;
+      --color-background-secondary: #2c2c2e;
+      --color-background-tertiary: #111111;
+      --color-text-primary: #f0f0f0;
+      --color-text-secondary: #ababab;
+      --color-text-tertiary: #6b6b6b;
+      --color-border-tertiary: rgba(255,255,255,0.1);
+      --color-border-secondary: rgba(255,255,255,0.18);
+      --color-border-primary: rgba(255,255,255,0.28);
+      --color-background-info: #0c2a44;
+      --color-text-info: #85B7EB;
+      --color-background-success: #172d08;
+      --color-text-success: #97C459;
+      --color-background-warning: #3a2500;
+      --color-text-warning: #EF9F27;
+      --color-background-danger: #2d0d0d;
+      --color-text-danger: #F09595;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-sans); background: var(--color-background-tertiary); color: var(--color-text-primary); min-height: 100vh; }
+  .app { display: flex; height: 100vh; overflow: hidden; }
+  .sidebar { width: 220px; background: var(--color-background-primary); border-right: 0.5px solid var(--color-border-tertiary); display: flex; flex-direction: column; flex-shrink: 0; }
+  .sidebar-logo { padding: 16px; border-bottom: 0.5px solid var(--color-border-tertiary); display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 32px; height: 32px; background: #185FA5; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; }
+  .logo-text { font-weight: 500; font-size: 14px; line-height: 1.2; }
+  .logo-sub { font-size: 11px; color: var(--color-text-secondary); }
+  .sidebar-nav { flex: 1; padding: 8px; overflow-y: auto; }
+  .nav-section { margin-bottom: 16px; }
+  .nav-label { font-size: 10px; font-weight: 500; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 8px; margin-bottom: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: var(--border-radius-md); cursor: pointer; font-size: 13px; color: var(--color-text-secondary); transition: all 0.1s; border: none; background: none; width: 100%; text-align: left; }
+  .nav-item:hover { background: var(--color-background-secondary); color: var(--color-text-primary); }
+  .nav-item.active { background: #E6F1FB; color: #185FA5; font-weight: 500; }
+  .nav-item i { font-size: 16px; }
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar { background: var(--color-background-primary); border-bottom: 0.5px solid var(--color-border-tertiary); padding: 0 20px; height: 52px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .topbar-title { font-size: 15px; font-weight: 500; }
+  .topbar-actions { display: flex; gap: 8px; align-items: center; }
+  .badge { font-size: 11px; padding: 3px 8px; border-radius: 20px; font-weight: 500; }
+  .badge-blue { background: #E6F1FB; color: #185FA5; }
+  .badge-green { background: #EAF3DE; color: #3B6D11; }
+  .badge-amber { background: #FAEEDA; color: #854F0B; }
+  .badge-red { background: #FCEBEB; color: #A32D2D; }
+  .content { flex: 1; overflow-y: auto; padding: 20px; }
+  .card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 16px 20px; margin-bottom: 16px; }
+  .card-title { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+  .tabs { display: flex; gap: 2px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 3px; margin-bottom: 16px; }
+  .tab { flex: 1; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; background: none; color: var(--color-text-secondary); transition: all 0.1s; text-align: center; }
+  .tab.active { background: var(--color-background-primary); color: var(--color-text-primary); border: 0.5px solid var(--color-border-tertiary); }
+  textarea.code-editor { width: 100%; min-height: 160px; font-family: var(--font-mono); font-size: 13px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); padding: 12px; color: var(--color-text-primary); resize: vertical; line-height: 1.6; outline: none; }
+  textarea.code-editor:focus { border-color: #185FA5; }
+  .btn { padding: 8px 16px; border-radius: var(--border-radius-md); font-size: 13px; font-weight: 500; cursor: pointer; border: 0.5px solid var(--color-border-secondary); background: none; color: var(--color-text-primary); transition: all 0.1s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn:hover { background: var(--color-background-secondary); }
+  .btn-primary { background: #185FA5; color: white; border-color: #185FA5; }
+  .btn-primary:hover { background: #0C447C; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  select, input[type=text] { padding: 7px 10px; border-radius: var(--border-radius-md); font-size: 13px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-secondary); color: var(--color-text-primary); outline: none; cursor: pointer; }
+  .score-bar { height: 8px; border-radius: 4px; background: var(--color-background-secondary); overflow: hidden; margin: 6px 0; }
+  .score-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
+  .finding { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 10px 14px; margin-bottom: 8px; }
+  .finding-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .finding-body { font-size: 12px; color: var(--color-text-secondary); line-height: 1.5; }
+  .finding-fix { margin-top: 6px; font-size: 12px; background: var(--color-background-secondary); padding: 6px 10px; border-radius: 6px; border-left: 2px solid #378ADD; }
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .stat-card { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 14px; }
+  .stat-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+  .stat-value { font-size: 22px; font-weight: 500; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--color-border-secondary); border-top-color: #185FA5; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .upload-zone { border: 1.5px dashed var(--color-border-secondary); border-radius: var(--border-radius-md); padding: 24px; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .upload-zone:hover { border-color: #185FA5; background: rgba(24,95,165,0.04); }
+  .upload-zone i { font-size: 28px; color: var(--color-text-tertiary); display: block; margin-bottom: 8px; }
+  .result-stream { font-size: 13px; line-height: 1.7; color: var(--color-text-primary); white-space: pre-wrap; }
+  .history-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 13px; }
+  .history-icon { width: 32px; height: 32px; border-radius: var(--border-radius-md); display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .chat-messages { max-height: 400px; overflow-y: auto; margin-bottom: 12px; }
+  .chat-msg { margin-bottom: 10px; }
+  .chat-msg.user { text-align: right; }
+  .chat-bubble { display: inline-block; max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
+  .chat-bubble.user { background: #185FA5; color: white; border-radius: 12px 12px 2px 12px; }
+  .chat-bubble.ai { background: var(--color-background-secondary); color: var(--color-text-primary); border-radius: 12px 12px 12px 2px; text-align: left; }
+  .hidden { display: none !important; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--color-border-secondary); border-radius: 3px; }
+  @media (max-width: 700px) {
+    .sidebar { width: 48px; }
+    .logo-text, .logo-sub, .nav-label, .nav-item span { display: none; }
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    .compare-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon"><i class="ti ti-database-cog"></i></div>
+    <div>
+      <div class="logo-text">QueryMind</div>
+      <div class="logo-sub">AI SQL Optimizer</div>
+    </div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-section">
+      <div class="nav-label">Analysis</div>
+      <button class="nav-item active" onclick="navigate('optimizer')"><i class="ti ti-wand"></i><span>Query Optimizer</span></button>
+      <button class="nav-item" onclick="navigate('explain')"><i class="ti ti-sitemap"></i><span>Explain Plan</span></button>
+      <button class="nav-item" onclick="navigate('awr')"><i class="ti ti-file-analytics"></i><span>AWR / Reports</span></button>
+      <button class="nav-item" onclick="navigate('compare')"><i class="ti ti-arrows-diff"></i><span>Compare Queries</span></button>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Tools</div>
+      <button class="nav-item" onclick="navigate('index')"><i class="ti ti-list-search"></i><span>Index Advisor</span></button>
+      <button class="nav-item" onclick="navigate('datagen')"><i class="ti ti-table-plus"></i><span>Data Generator</span></button>
+      <button class="nav-item" onclick="navigate('nl')"><i class="ti ti-message-chatbot"></i><span>NL Assistant</span></button>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Insights</div>
+      <button class="nav-item" onclick="navigate('dashboard')"><i class="ti ti-layout-dashboard"></i><span>Dashboard</span></button>
+      <button class="nav-item" onclick="navigate('dbconn')"><i class="ti ti-plug-connected"></i><span>DB Connection (TNS)</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="page-title">Query Optimizer</div>
+    <div class="topbar-actions">
+      <select id="db-select" onchange="updateDB()">
+        <option>PostgreSQL</option><option>Oracle</option><option>MySQL</option>
+        <option>SQL Server</option><option>MariaDB</option><option>Snowflake</option>
+        <option>MongoDB</option><option>Cassandra</option><option>Redis</option><option>Elasticsearch</option>
+      </select>
+      <select id="llm-select" onchange="updateLLM()" title="Choose AI model">
+        <option value="claude">Claude</option>
+        <option value="openai">OpenAI</option>
+        <option value="kimi">Kimi</option>
+      </select>
+      <span class="badge badge-blue" id="mode-badge">SQL</span>
+    </div>
+  </div>
+  <div class="content" id="main-content"></div>
+</div>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+// All AI calls go through the local backend server (server.js), which holds
+// the API keys for Claude / OpenAI / Kimi in a .env file. No key is ever
+// entered or stored in the browser.
+const CHAT_API = "/api/chat";
+
+let currentLLM = "claude";
+let currentPage = "optimizer";
+let analysisHistory = [];
+let chatHistory = [];
+
+const noSqlDbs = ["MongoDB","Cassandra","Redis","Elasticsearch"];
+
+function updateDB() {
+  const db = document.getElementById("db-select").value;
+  const badge = document.getElementById("mode-badge");
+  badge.textContent = noSqlDbs.includes(db) ? "NoSQL" : "SQL";
+  badge.className = "badge " + (noSqlDbs.includes(db) ? "badge-amber" : "badge-blue");
+}
+
+function updateLLM() {
+  currentLLM = document.getElementById("llm-select").value;
+}
+
+function navigate(page) {
+  currentPage = page;
+  document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
+  const titles = { optimizer:"Query Optimizer", explain:"Explain Plan Analysis", awr:"AWR & Performance Reports", compare:"Compare Queries", index:"Index Advisor", datagen:"Data Generator", nl:"NL Assistant", dashboard:"Dashboard", dbconn:"Database Connection (TNS)" };
+  document.getElementById("page-title").textContent = titles[page] || page;
+  event && event.currentTarget && event.currentTarget.classList.add("active");
+  renderPage(page);
+}
+
+function renderPage(page) {
+  const c = document.getElementById("main-content");
+  const pages = { optimizer:renderOptimizer, explain:renderExplain, awr:renderAWR, compare:renderCompare, index:renderIndex, datagen:renderDatagen, nl:renderNL, dashboard:renderDashboard, dbconn:renderDBConn };
+  if (pages[page]) pages[page](c);
+}
+
+async function callAI(systemPrompt, userPrompt) {
+  const resp = await fetch(CHAT_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      provider: currentLLM,
+      system: systemPrompt,
+      prompt: userPrompt,
+      max_tokens: 2000
+    })
+  });
+
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.error || "API error " + resp.status);
+  return data.text;
+}
+
+// ── DATABASE CONNECTION (TNS) ────────────────────────────────────────────────
+function renderDBConn(c) {
+  c.innerHTML = `
+  <div class="card">
+    <div class="card-title"><i class="ti ti-plug-connected"></i> Oracle TNS Connection</div>
+    <p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">
+      Connect to a company Oracle database using a TNS alias defined in <code>tnsnames.ora</code>
+      (the server reads this from the <code>TNS_ADMIN</code> path configured in <code>.env</code>).
+      Credentials are sent to your local server only and are not stored.
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div>
+        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px">TNS Alias</label>
+        <select id="tns-alias" style="width:100%"><option value="">Loading...</option></select>
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px">&nbsp;</label>
+        <button class="btn btn-sm" onclick="loadTNSEntries()"><i class="ti ti-refresh"></i> Refresh TNS list</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div>
+        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px">Username</label>
+        <input type="text" id="tns-user" style="width:100%" placeholder="db username">
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px">Password</label>
+        <input type="password" id="tns-password" style="width:100%" placeholder="db password">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="testTNSConnection()"><i class="ti ti-plug"></i> Test Connection</button>
+    </div>
+    <div id="tns-status" style="margin-top:12px;font-size:13px"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><i class="ti ti-code"></i> Run a Query Against Connected DB</div>
+    <p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px">Use this to pull real schema or sample rows, then paste into the Optimizer or Data Generator.</p>
+    <textarea class="code-editor" id="tns-sql" placeholder="SELECT * FROM dual" style="min-height:80px"></textarea>
+    <button class="btn btn-primary" style="margin-top:10px" onclick="runTNSQuery()"><i class="ti ti-player-play"></i> Run Query</button>
+    <div id="tns-query-results" style="margin-top:12px"></div>
+  </div>`;
+
+  loadTNSEntries();
+}
+
+async function loadTNSEntries() {
+  const sel = document.getElementById('tns-alias');
+  sel.innerHTML = '<option value="">Loading...</option>';
+  try {
+    const resp = await fetch('/api/db/tns-entries');
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Failed to load TNS entries');
+    sel.innerHTML = data.aliases.length
+      ? data.aliases.map(a => `<option value="${a}">${a}</option>`).join('')
+      : '<option value="">No entries found in tnsnames.ora</option>';
+  } catch (err) {
+    sel.innerHTML = '<option value="">Unavailable</option>';
+    document.getElementById('tns-status').innerHTML = `<span style="color:var(--color-text-danger)">Could not load TNS entries: ${err.message}</span>`;
+  }
+}
+
+async function testTNSConnection() {
+  const tnsAlias = document.getElementById('tns-alias').value;
+  const user = document.getElementById('tns-user').value;
+  const password = document.getElementById('tns-password').value;
+  const status = document.getElementById('tns-status');
+  if (!tnsAlias || !user || !password) { status.innerHTML = '<span style="color:var(--color-text-danger)">Please fill in alias, username, and password.</span>'; return; }
+  status.innerHTML = '<div class="spinner" style="width:14px;height:14px"></div> Connecting...';
+  try {
+    const resp = await fetch('/api/db/connect', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ tnsAlias, user, password })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error);
+    status.innerHTML = `<span style="color:var(--color-text-success)"><i class="ti ti-check"></i> ${data.message}</span>`;
+  } catch (err) {
+    status.innerHTML = `<span style="color:var(--color-text-danger)"><i class="ti ti-x"></i> ${err.message}</span>`;
+  }
+}
+
+async function runTNSQuery() {
+  const tnsAlias = document.getElementById('tns-alias').value;
+  const user = document.getElementById('tns-user').value;
+  const password = document.getElementById('tns-password').value;
+  const sql = document.getElementById('tns-sql').value.trim();
+  const out = document.getElementById('tns-query-results');
+  if (!tnsAlias || !user || !password || !sql) { out.innerHTML = '<span style="color:var(--color-text-danger)">Fill in connection details and a SQL query.</span>'; return; }
+  out.innerHTML = '<div class="spinner" style="width:14px;height:14px"></div> Running...';
+  try {
+    const resp = await fetch('/api/db/query', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ tnsAlias, user, password, sql })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error);
+    const cols = (data.metaData||[]).map(m=>m.name);
+    out.innerHTML = `<textarea class="code-editor" readonly style="min-height:160px">${JSON.stringify(data.rows, null, 2)}</textarea>
+      <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">Columns: ${cols.join(', ')}</div>`;
+  } catch (err) {
+    out.innerHTML = `<span style="color:var(--color-text-danger)">${err.message}</span>`;
+  }
+}
+
+// ── OPTIMIZER ─────────────────────────────────────────────────────────────────
+function renderOptimizer(c) {
+  c.innerHTML = `
+  <div class="card">
+    <div class="card-title"><i class="ti ti-code"></i> Input Query</div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchInputTab(this,'paste')">Paste Query</button>
+      <button class="tab" onclick="switchInputTab(this,'upload')">Upload File</button>
+    </div>
+    <div id="input-paste">
+      <textarea class="code-editor" id="query-input" placeholder="Paste your SQL or NoSQL query here..."></textarea>
+    </div>
+    <div id="input-upload" class="hidden">
+      <div class="upload-zone" onclick="document.getElementById('file-upload').click()">
+        <i class="ti ti-upload"></i>
+        <div style="font-size:13px;color:var(--color-text-secondary)">Click to upload .sql .txt .json</div>
+        <input type="file" id="file-upload" class="hidden" accept=".sql,.txt,.json,.xml,.csv" onchange="loadFile(event)">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+      <button class="btn btn-primary" onclick="runOptimizer()"><i class="ti ti-wand"></i> Analyze & Optimize</button>
+      <button class="btn btn-sm" onclick="loadExample()"><i class="ti ti-file-code"></i> Load Example</button>
+      <button class="btn btn-sm" onclick="document.getElementById('query-input').value=''"><i class="ti ti-trash"></i> Clear</button>
+    </div>
+  </div>
+  <div id="optimizer-results" class="hidden">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px" id="score-cards"></div>
+    <div class="card"><div class="card-title"><i class="ti ti-alert-triangle"></i> Issues Detected</div><div id="findings-list"></div></div>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-check"></i> Optimized Query</div>
+      <textarea class="code-editor" id="optimized-query" readonly style="min-height:120px"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-sm" onclick="copyTextById('optimized-query')"><i class="ti ti-copy"></i> Copy</button>
+        <button class="btn btn-sm" onclick="exportResult()"><i class="ti ti-download"></i> Export</button>
+      </div>
+    </div>
+    <div class="card"><div class="card-title"><i class="ti ti-info-circle"></i> Optimization Explanation</div><div id="opt-explanation" class="result-stream"></div></div>
+  </div>
+  <div id="opt-loading" class="hidden" style="text-align:center;padding:40px">
+    <div class="spinner" style="margin:0 auto 12px"></div>
+    <div style="font-size:13px;color:var(--color-text-secondary)">Analyzing query with AI...</div>
+  </div>`;
+}
+
+function switchInputTab(btn, mode) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('input-paste').classList.toggle('hidden', mode !== 'paste');
+  document.getElementById('input-upload').classList.toggle('hidden', mode !== 'upload');
+}
+
+function loadFile(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => { document.getElementById('query-input').value = ev.target.result; switchInputTab(document.querySelectorAll('.tab')[0],'paste'); };
+  r.readAsText(f);
+}
+
+function loadExample() {
+  const db = document.getElementById('db-select').value;
+  const examples = {
+    "MongoDB": `db.orders.find({\n  status: "active",\n  $where: "this.total > 1000"\n}).sort({created_at: -1})`,
+    "default": `SELECT *\nFROM orders o, customers c, products p\nWHERE o.customer_id = c.id\n  AND o.product_id = p.id\n  AND UPPER(c.email) = 'USER@EXAMPLE.COM'\n  AND p.category = 'Electronics'\nORDER BY o.created_at DESC`
+  };
+  document.getElementById('query-input').value = examples[db] || examples.default;
+}
+
+async function runOptimizer() {
+  const query = document.getElementById('query-input').value.trim();
+  if (!query) { alert("Please enter a query first"); return; }
+  const db = document.getElementById('db-select').value;
+  document.getElementById('opt-loading').classList.remove('hidden');
+  document.getElementById('optimizer-results').classList.add('hidden');
+
+  const sys = `You are an expert database query optimizer specializing in ${db}. Return ONLY valid JSON:
+{"originalScore":number,"optimizedScore":number,"findings":[{"type":"string","severity":"HIGH|MEDIUM|LOW","impact":"string","explanation":"string","fix":"string"}],"optimizedQuery":"string","explanation":{"changes":["string"],"benefits":["string"],"risks":["string"]}}`;
+
+  try {
+    const raw = await callAI(sys, `Analyze and optimize this ${db} query:\n\n${query}`);
+    const data = JSON.parse(raw.replace(/\`\`\`json|\`\`\`/g,'').trim());
+    document.getElementById('opt-loading').classList.add('hidden');
+    document.getElementById('optimizer-results').classList.remove('hidden');
+
+    const c1 = data.originalScore < 40 ? '#E24B4A' : data.originalScore < 70 ? '#EF9F27' : '#639922';
+    const c2 = data.optimizedScore < 40 ? '#E24B4A' : data.optimizedScore < 70 ? '#EF9F27' : '#639922';
+    document.getElementById('score-cards').innerHTML = `
+      <div class="card" style="margin:0"><div class="stat-label">Original Score</div>
+        <div style="font-size:28px;font-weight:500;color:${c1}">${data.originalScore}<span style="font-size:16px;color:var(--color-text-secondary)">/100</span></div>
+        <div class="score-bar"><div class="score-fill" style="width:${data.originalScore}%;background:${c1}"></div></div></div>
+      <div class="card" style="margin:0"><div class="stat-label">Optimized Score</div>
+        <div style="font-size:28px;font-weight:500;color:${c2}">${data.optimizedScore}<span style="font-size:16px;color:var(--color-text-secondary)">/100</span></div>
+        <div class="score-bar"><div class="score-fill" style="width:${data.optimizedScore}%;background:${c2}"></div></div></div>`;
+
+    document.getElementById('findings-list').innerHTML = (data.findings||[]).map(f => {
+      const sev = {HIGH:'badge-red',MEDIUM:'badge-amber',LOW:'badge-blue'}[f.severity]||'badge-blue';
+      return `<div class="finding"><div class="finding-header"><span class="badge ${sev}">${f.severity}</span><strong style="font-size:13px">${f.type}</strong></div>
+        <div class="finding-body"><b>Impact:</b> ${f.impact}<br>${f.explanation}<div class="finding-fix"><b>Fix:</b> ${f.fix}</div></div></div>`;
+    }).join('') || '<div style="font-size:13px;color:var(--color-text-secondary)">No major issues detected.</div>';
+
+    document.getElementById('optimized-query').value = data.optimizedQuery || query;
+    const exp = data.explanation||{};
+    let html = '';
+    if (exp.changes?.length) html += `<b>Changes made:</b><ul style="margin:4px 0 8px 16px;font-size:12px">${exp.changes.map(c=>`<li>${c}</li>`).join('')}</ul>`;
+    if (exp.benefits?.length) html += `<b>Expected benefits:</b><ul style="margin:4px 0 8px 16px;font-size:12px">${exp.benefits.map(b=>`<li>${b}</li>`).join('')}</ul>`;
+    if (exp.risks?.length) html += `<b>Potential risks:</b><ul style="margin:4px 0 8px 16px;font-size:12px">${exp.risks.map(r=>`<li>${r}</li>`).join('')}</ul>`;
+    document.getElementById('opt-explanation').innerHTML = html;
+    analysisHistory.unshift({db, score:data.originalScore, optimized:data.optimizedScore, time:new Date().toLocaleTimeString(), query:query.substring(0,60)+'...'});
+  } catch(err) {
+    document.getElementById('opt-loading').classList.add('hidden');
+    alert("Error: " + err.message);
+  }
+}
+
+// ── EXPLAIN PLAN ──────────────────────────────────────────────────────────────
+function renderExplain(c) {
+  c.innerHTML = `
+  <div class="card">
+    <div class="card-title"><i class="ti ti-sitemap"></i> Upload or Paste Execution Plan</div>
+    <textarea class="code-editor" id="explain-input" placeholder="Paste your execution plan (Oracle, PostgreSQL, MySQL, SQL Server)..." style="min-height:200px"></textarea>
+    <button class="btn btn-primary" style="margin-top:10px" onclick="runExplain()"><i class="ti ti-analyze"></i> Analyze Plan</button>
+  </div>
+  <div id="explain-results" class="hidden"></div>
+  <div id="explain-loading" class="hidden" style="text-align:center;padding:40px">
+    <div class="spinner" style="margin:0 auto 12px"></div>
+    <div style="font-size:13px;color:var(--color-text-secondary)">Analyzing execution plan...</div>
+  </div>`;
+}
+
+async function runExplain() {
+  const plan = document.getElementById('explain-input').value.trim();
+  if (!plan) { alert("Please enter an execution plan"); return; }
+  const db = document.getElementById('db-select').value;
+  document.getElementById('explain-loading').classList.remove('hidden');
+  document.getElementById('explain-results').classList.add('hidden');
+
+  const sys = `You are a ${db} execution plan expert. Return ONLY valid JSON:
+{"summary":"string","bottlenecks":["string"],"costlyOps":[{"op":"string","cost":"string","issue":"string"}],"recommendations":["string"],"plainEnglish":"string"}`;
+
+  try {
+    const raw = await callAI(sys, `Analyze this ${db} execution plan:\n\n${plan}`);
+    const data = JSON.parse(raw.replace(/\`\`\`json|\`\`\`/g,'').trim());
+    document.getElementById('explain-loading').classList.add('hidden');
+    document.getElementById('explain-results').classList.remove('hidden');
+    document.getElementById('explain-results').innerHTML = `
+      <div class="card"><div class="card-title"><i class="ti ti-file-description"></i> Executive Summary</div><p style="font-size:13px;line-height:1.7">${data.summary}</p></div>
+      <div class="card"><div class="card-title"><i class="ti ti-language"></i> Plain English Explanation</div><p style="font-size:13px;line-height:1.7">${data.plainEnglish}</p></div>
+      <div class="card"><div class="card-title"><i class="ti ti-flame"></i> Bottlenecks</div>${(data.bottlenecks||[]).map(b=>`<div class="finding" style="margin-bottom:6px"><div class="finding-body">${b}</div></div>`).join('')}</div>
+      <div class="card"><div class="card-title"><i class="ti ti-table"></i> Costly Operations</div>${(data.costlyOps||[]).map(op=>`<div class="finding" style="margin-bottom:6px"><div class="finding-header"><span class="badge badge-red">${op.op}</span><span style="font-size:12px;color:var(--color-text-secondary)">Cost: ${op.cost}</span></div><div class="finding-body">${op.issue}</div></div>`).join('')}</div>
+      <div class="card"><div class="card-title"><i class="ti ti-bulb"></i> Recommendations</div>${(data.recommendations||[]).map((r,i)=>`<div style="display:flex;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:13px"><span style="color:#185FA5;font-weight:500;min-width:20px">${i+1}.</span>${r}</div>`).join('')}</div>`;
+  } catch(err) {
+    document.getElementById('explain-loading').classList.add('hidden');
+    alert("Error: " + err.message);
+  }
+}
+
+// ── AWR ───────────────────────────────────────────────────────────────────────
+function renderAWR(c) {
+  c.innerHTML = `
+  <div class="card">
+    <div class="card-title"><i class="ti ti-file-analytics"></i> Upload Performance Report</div>
+    <div class="upload-zone" onclick="document.getElementById('awr-file').click()" style="margin-bottom:12px">
+      <i class="ti ti-file-upload"></i>
+      <div style="font-size:13px;color:var(--color-text-secondary)">Upload AWR, ASH, Statspack, or SQL Monitor report</div>
+      <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">or paste content below</div>
+      <input type="file" id="awr-file" class="hidden" accept=".html,.txt,.xml,.csv" onchange="loadAWR(event)">
+    </div>
+    <textarea class="code-editor" id="awr-input" placeholder="Paste AWR/ASH report content here..." style="min-height:160px"></textarea>
+    <button class="btn btn-primary" style="margin-top:10px" onclick="runAWR()"><i class="ti ti-report-analytics"></i> Analyze Report</button>
+  </div>
+  <div id="awr-results" class="hidden"></div>
+  <div id="awr-loading" class="hidden" style="text-align:center;padding:40px">
+    <div class="spinner" style="margin:0 auto 12px"></div>
+    <div style="font-size:13px;color:var(--color-text-secondary)">Analyzing performance report...</div>
+  </div>`;
+}
+
+function loadAWR(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => document.getElementById('awr-input').value = ev.target.result.substring(0,8000);
+  r.readAsText(f);
+}
+
+async function runAWR() {
+  const content = document.getElementById('awr-input').value.trim();
+  if (!content) { alert("Please upload or paste a performance report"); return; }
+  document.getElementById('awr-loading').classList.remove('hidden');
+  document.getElementById('awr-results').classList.add('hidden');
+
+  const sys = `You are a database performance expert. Analyze AWR/ASH/Statspack reports. Return ONLY valid JSON:
+{"executiveSummary":"string","topSQL":["string"],"waitEvents":["string"],"bottlenecks":{"cpu":"string","memory":"string","io":"string","locking":"string"},"rootCauses":["string"],"actions":["string"]}`;
+
+  try {
+    const raw = await callAI(sys, `Analyze this performance report:\n\n${content.substring(0,4000)}`);
+    const data = JSON.parse(raw.replace(/\`\`\`json|\`\`\`/g,'').trim());
+    document.getElementById('awr-loading').classList.add('hidden');
+    document.getElementById('awr-results').classList.remove('hidden');
+    document.getElementById('awr-results').innerHTML = `
+      <div class="card"><div class="card-title"><i class="ti ti-report"></i> Executive Summary</div><p style="font-size:13px;line-height:1.7">${data.executiveSummary}</p></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="card"><div class="card-title"><i class="ti ti-bolt"></i> Wait Events</div>${(data.waitEvents||[]).map(e=>`<div style="padding:5px 0;font-size:12px;border-bottom:0.5px solid var(--color-border-tertiary)">${e}</div>`).join('')}</div>
+        <div class="card"><div class="card-title"><i class="ti ti-code"></i> Top SQL Issues</div>${(data.topSQL||[]).map(s=>`<div style="padding:5px 0;font-size:12px;border-bottom:0.5px solid var(--color-border-tertiary)">${s}</div>`).join('')}</div>
+      </div>
+      <div class="card"><div class="card-title"><i class="ti ti-cpu"></i> Bottleneck Analysis</div>${Object.entries(data.bottlenecks||{}).map(([k,v])=>`<div style="display:flex;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:12px"><span class="badge badge-amber" style="min-width:60px;text-align:center;text-transform:capitalize">${k}</span>${v}</div>`).join('')}</div>
+      <div class="card"><div class="card-title"><i class="ti ti-list-check"></i> Recommended Actions</div>${(data.actions||[]).map((a,i)=>`<div style="display:flex;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:13px"><span style="color:#185FA5;font-weight:500;min-width:20px">${i+1}.</span>${a}</div>`).join('')}</div>`;
+  } catch(err) {
+    document.getElementById('awr-loading').classList.add('hidden');
+    alert("Error: " + err.message);
+  }
+}
+
+// ── COMPARE ───────────────────────────────────────────────────────────────────
+function renderCompare(c) {
+  c.innerHTML = `
+  <div class="compare-grid" style="margin-bottom:16px">
+    <div class="card" style="margin:0"><div class="card-title"><i class="ti ti-file-code"></i> Version A (Original)</div><textarea class="code-editor" id="query-a" placeholder="Paste original query..." style="min-height:180px"></textarea></div>
+    <div class="card" style="margin:0"><div class="card-title"><i class="ti ti-file-sparkle"></i> Version B (Modified)</div><textarea class="code-editor" id="query-b" placeholder="Paste modified query..." style="min-height:180px"></textarea></div>
+  </div>
+  <div style="text-align:center;margin-bottom:16px"><button class="btn btn-primary" onclick="runCompare()"><i class="ti ti-arrows-diff"></i> Compare Queries</button></div>
+  <div id="compare-results" class="hidden"></div>
+  <div id="compare-loading" class="hidden" style="text-align:center;padding:40px">
+    <div class="spinner" style="margin:0 auto 12px"></div>
+    <div style="font-size:13px;color:var(--color-text-secondary)">Comparing queries...</div>
+  </div>`;
+}
+
+async function runCompare() {
+  const a = document.getElementById('query-a').value.trim();
+  const b = document.getElementById('query-b').value.trim();
+  if (!a || !b) { alert("Please enter both queries"); return; }
+  document.getElementById('compare-loading').classList.remove('hidden');
+  document.getElementById('compare-results').classList.add('hidden');
+
+  const sys = `Compare two SQL/NoSQL queries. Return ONLY valid JSON:
+{"scoreA":{"cost":number,"complexity":number,"readability":number,"scalability":number},"scoreB":{"cost":number,"complexity":number,"readability":number,"scalability":number},"improvements":["string"],"regressions":["string"],"recommendation":"A or B","rationale":"string"}
+All scores 0-100.`;
+
+  try {
+    const raw = await callAI(sys, `Compare:\n\nQuery A:\n${a}\n\nQuery B:\n${b}`);
+    const d = JSON.parse(raw.replace(/\`\`\`json|\`\`\`/g,'').trim());
+    document.getElementById('compare-loading').classList.add('hidden');
+    document.getElementById('compare-results').classList.remove('hidden');
+
+    const metrics = ['cost','complexity','readability','scalability'];
+    document.getElementById('compare-results').innerHTML = `
+      <div class="card">
+        <div class="card-title"><i class="ti ti-chart-bar"></i> Score Comparison</div>
+        ${metrics.map(m=>`<div style="margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+            <span style="color:var(--color-text-secondary);text-transform:capitalize">${m}</span>
+            <span><b>A: ${d.scoreA[m]}</b> vs <b>B: ${d.scoreB[m]}</b></span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+            <div class="score-bar"><div class="score-fill" style="width:${d.scoreA[m]}%;background:#378ADD"></div></div>
+            <div class="score-bar"><div class="score-fill" style="width:${d.scoreB[m]}%;background:#1D9E75"></div></div>
+          </div></div>`).join('')}
+        <div style="display:flex;gap:12px;font-size:12px;margin-top:4px">
+          <span><span style="display:inline-block;width:12px;height:4px;background:#378ADD;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Version A</span>
+          <span><span style="display:inline-block;width:12px;height:4px;background:#1D9E75;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Version B</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-trophy"></i> Verdict</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <span class="badge" style="background:#E6F1FB;color:#185FA5;font-size:14px;padding:6px 14px">Use Version ${d.recommendation}</span>
+          <span style="font-size:13px">${d.rationale}</span>
+        </div>
+        ${d.improvements?.length?`<div><b style="font-size:12px">Improvements in B:</b>${d.improvements.map(i=>`<div style="font-size:12px;padding:3px 0;color:var(--color-text-success)">✓ ${i}</div>`).join('')}</div>`:''}
+        ${d.regressions?.length?`<div style="margin-top:8px"><b style="font-size:12px">Regressions in B:</b>${d.regressions.map(r=>`<div style="font-size:12px;padding:3px 0;color:var(--color-text-danger)">✗ ${r}</div>`).join('')}</div>`:''}
+      </div>`;
+  } catch(err) {
+    document.getElementById('compare-loading').classList.add('hidden');
+    alert("Error: " + err.message);
+  }
+}
+
+// ── INDEX ADVISOR ─────────────────────────────────────────────────────────────
+function renderIndex(c) {
+  c.innerHTML = `
+  <div class="card">
+    <div class="card-title"><i class="ti ti-list-search"></i> Query & Schema Input</div>
+    <textarea class="code-editor" id="index-query" placeholder="Paste your slow query..." style="min-height:100px;margin-bottom:8px"></textarea>
+    <textarea class="code-editor" id="index-schema" placeholder="Paste table DDL / schema (optional but recommended)..." style="min-height:80px"></textarea>
+    <button class="btn btn-primary" style="margin-top:10px" onclick="runIndex()"><i class="ti ti-bulb"></i> Recommend Indexes</button>
+  </div>
+  <div id="index-results" class="hidden"></div>
+  <div id="index-loading" class="hidden" style="text-align:center;padding:40px">
+    <div class="spinner" style="margin:0 auto 12px"></div>
+    <div style="font-size:13px;color:var(--color-text-secondary)">Generating index recommendations...</div>
+  </div>`;
+}
+
+async function runIndex() {
+  const query = document.getElementById('index-query').value.trim();
+  const schema = document.getElementById('index-schema').value.trim();
+  if (!query) { alert("Please enter a query"); return; }
+  const db = document.getElementById('db-select').value;
+  document.getElementById('index-loading').classList.remove('hidden');
+  document.getElementById('index-results').classList.add('hidden');
+
+  const sys = `You are a ${db} index optimization expert. Return ONLY valid JSON:
+{"indexes":[{"type":"string","ddl":"string","benefit":"string","maintenanceCost":"LOW|MEDIUM|HIGH","storageImpact":"string","priority":"HIGH|MEDIUM|LOW"}],"partitioningSuggestion":"string or null","analysis":"string"}`;
+
+  try {
+    const raw = await callAI(sys, `Query:\n${query}\n\nSchema:\n${schema||'not provided'}`);
+    const data = JSON.parse(raw.replace(/\`\`\`json|\`\`\`/g,'').trim());
+    document.getElementById('index-loading').classList.add('hidden');
+    document.getElementById('index-results').classList.remove('hidden');
+    document.getElementById('index-results').innerHTML = `
+      <div class="card"><div class="card-title"><i class="ti ti-info-circle"></i> Analysis</div><p style="font-size:13px;line-height:1.7">${data.analysis}</p></div>
+      ${(data.indexes||[]).map(idx=>`
+        <div class="card">
+          <div class="card-title"><span class="badge badge-blue">${idx.type}</span><span class="badge ${idx.priority==='HIGH'?'badge-red':idx.priority==='MEDIUM'?'badge-amber':'badge-green'}">${idx.priority} priority</span></div>
+          <textarea class="code-editor" readonly style="min-height:50px;margin-bottom:8px">${idx.ddl}</textarea>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px">
+            <div><span style="color:var(--color-text-secondary)">Benefit</span><br>${idx.benefit}</div>
+            <div><span style="color:var(--color-text-secondary)">Maintenance</span><br><span class="badge ${idx.maintenanceCost==='HIGH'?'badge-red':idx.maintenanceCost==='MEDIUM'?'badge-amber':'badge-green'}">${idx.maintenanceCost}</span></div>
+            <div><span style="color:var(--color-text-secondary)">Storage</span><br>${idx.storageImpact}</div>
+          </div>
+        </div>`).join('')}
+      ${data.partitioningSuggestion?`<div class="card"><div class="card-title"><i class="ti ti-layout-grid"></i> Partitioning Suggestion</div><p style="font-size:13px">${data.partitioningSuggestion}</p></div>`:''}`;
+  } catch(err) {
+    document.getElementById('index-loading').classList.add('hidden');
+    alert("Error: " + err.message);
+  }
+}
+
+// ── DATA GENERATOR ────────────────────────────────────────────────────────────
+function renderDatagen(c) {
+  c.innerHTML = `
+  <div class="card">
+    <div class="card-title"><i class="ti ti-table-plus"></i> Sample Data Generator</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px">Table description</label>
+        <input type="text" id="datagen-desc" placeholder="e.g. e-commerce orders with customers" style="width:100%"></div>
+      <div><label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px">Row count</label>
+        <select id="datagen-rows" style="width:100%"><option>5</option><option selected>10</option><option>20</option><option>50</option></select></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px">Output format</label>
+        <select id="datagen-format" style="width:100%"><option>SQL INSERT</option><option>JSON</option><option>CSV</option></select></div>
+      <div><label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px">Include DDL?</label>
+        <select id="datagen-ddl" style="width:100%"><option>Yes</option><option>No</option></select></div>
+    </div>
+    <button class="btn btn-primary" onclick="runDatagen()"><i class="ti ti-sparkles"></i> Generate Data</button>
+  </div>
+  <div id="datagen-results" class="hidden"></div>
+  <div id="datagen-loading" class="hidden" style="text-align:center;padding:40px">
+    <div class="spinner" style="margin:0 auto 12px"></div>
+    <div style="font-size:13px;color:var(--color-text-secondary)">Generating sample data...</div>
+  </div>`;
+}
+
+async function runDatagen() {
+  const desc = document.getElementById('datagen-desc').value.trim()||'orders with customers and products';
+  const rows = document.getElementById('datagen-rows').value;
+  const format = document.getElementById('datagen-format').value;
+  const ddl = document.getElementById('datagen-ddl').value === 'Yes';
+  const db = document.getElementById('db-select').value;
+  document.getElementById('datagen-loading').classList.remove('hidden');
+  document.getElementById('datagen-results').classList.add('hidden');
+
+  const sys = `You are a test data generator for ${db}. Return ONLY valid JSON:
+{"ddl":"CREATE TABLE statement or null","data":"the INSERT/JSON/CSV data as a string","explanation":"string"}`;
+
+  try {
+    const raw = await callAI(sys, `Generate ${rows} rows of ${desc} in ${format} format${ddl?' with DDL':''} for ${db}`);
+    const data = JSON.parse(raw.replace(/\`\`\`json|\`\`\`/g,'').trim());
+    document.getElementById('datagen-loading').classList.add('hidden');
+    document.getElementById('datagen-results').classList.remove('hidden');
+    document.getElementById('datagen-results').innerHTML = `
+      ${ddl&&data.ddl?`<div class="card"><div class="card-title"><i class="ti ti-table"></i> DDL</div><textarea class="code-editor" readonly style="min-height:80px">${data.ddl}</textarea></div>`:''}
+      <div class="card">
+        <div class="card-title"><i class="ti ti-database"></i> Generated Data</div>
+        <p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px">${data.explanation}</p>
+        <textarea class="code-editor" readonly style="min-height:200px" id="gen-data-out">${data.data}</textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-sm" onclick="copyTextById('gen-data-out')"><i class="ti ti-copy"></i> Copy</button>
+          <button class="btn btn-sm" onclick="downloadText(document.getElementById('gen-data-out').value,'data.txt')"><i class="ti ti-download"></i> Download</button>
+        </div>
+      </div>`;
+  } catch(err) {
+    document.getElementById('datagen-loading').classList.add('hidden');
+    alert("Error: " + err.message);
+  }
+}
+
+// ── NL ASSISTANT ──────────────────────────────────────────────────────────────
+function renderNL(c) {
+  c.innerHTML = `
+  <div class="card" style="display:flex;flex-direction:column;min-height:500px">
+    <div class="card-title"><i class="ti ti-message-chatbot"></i> Natural Language Database Assistant</div>
+    <div class="chat-messages" id="chat-msgs" style="flex:1;overflow-y:auto">
+      <div class="chat-msg"><div class="chat-bubble ai">Hi! Ask me anything about queries, execution plans, performance, or optimization.<br><br>• "Why is this query slow?"<br>• "How can I improve this join?"<br>• "Generate an index recommendation"<br>• "Explain this execution plan"</div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input type="text" id="nl-input" placeholder="Ask a database question..." style="flex:1" onkeydown="if(event.key==='Enter')sendNL()">
+      <button class="btn btn-primary" onclick="sendNL()"><i class="ti ti-send"></i></button>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+      ${["Why is SELECT * bad?","What indexes should I add?","Explain EXPLAIN ANALYZE","How to fix N+1 queries?"].map(q=>`<button class="btn btn-sm" onclick="quickNL('${q}')">${q}</button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function quickNL(q) { document.getElementById('nl-input').value = q; sendNL(); }
+
+async function sendNL() {
+  const input = document.getElementById('nl-input');
+  const msg = input.value.trim(); if (!msg) return;
+  const db = document.getElementById('db-select').value;
+  input.value = '';
+  const msgs = document.getElementById('chat-msgs');
+  msgs.innerHTML += `<div class="chat-msg user"><div class="chat-bubble user">${msg}</div></div>`;
+  msgs.innerHTML += `<div class="chat-msg" id="ai-typing"><div class="chat-bubble ai"><div class="spinner" style="width:14px;height:14px;margin:2px"></div></div></div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+  chatHistory.push({role:"user",content:msg});
+
+  try {
+    const resp = await callAI(`You are an expert ${db} database assistant. Give concise, practical answers.`, chatHistory.map(m=>`${m.role}: ${m.content}`).join('\n'));
+    chatHistory.push({role:"assistant",content:resp});
+    document.getElementById('ai-typing').innerHTML = `<div class="chat-bubble ai">${resp.replace(/\n/g,'<br>')}</div>`;
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch(err) {
+    document.getElementById('ai-typing').innerHTML = `<div class="chat-bubble ai" style="color:var(--color-text-danger)">Error: ${err.message}</div>`;
+  }
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+function renderDashboard(c) {
+  const total = analysisHistory.length;
+  const avgScore = total ? Math.round(analysisHistory.reduce((a,b)=>a+b.score,0)/total) : 0;
+  const avgOpt = total ? Math.round(analysisHistory.reduce((a,b)=>a+b.optimized,0)/total) : 0;
+  c.innerHTML = `
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Total Analyses</div><div class="stat-value">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Original Score</div><div class="stat-value">${avgScore}</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Optimized Score</div><div class="stat-value">${avgOpt}</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Improvement</div><div class="stat-value" style="color:#1D9E75">+${avgOpt-avgScore}</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-history"></i> Analysis History</div>
+    ${total===0?'<div style="text-align:center;padding:40px;color:var(--color-text-secondary);font-size:13px">No analyses yet. Run your first query optimization above.</div>':
+    analysisHistory.map(h=>`<div class="history-item">
+      <div class="history-icon" style="background:#E6F1FB;color:#185FA5"><i class="ti ti-database"></i></div>
+      <div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.query}</div><div style="font-size:11px;color:var(--color-text-tertiary)">${h.db} · ${h.time}</div></div>
+      <div style="text-align:right"><span class="badge badge-red">${h.score}</span><span style="color:var(--color-text-tertiary);font-size:11px;margin:0 4px">→</span><span class="badge badge-green">${h.optimized}</span></div>
+    </div>`).join('')}
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-key"></i> AI Provider Status</div>
+    <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">API keys are configured server-side via a <code>.env</code> file — users never enter keys. Status of each provider:</p>
+    <div id="provider-status" style="font-size:13px">Checking...</div>
+  </div>`;
+  loadProviderStatus();
+}
+
+async function loadProviderStatus() {
+  const el = document.getElementById('provider-status');
+  try {
+    const resp = await fetch('/api/providers');
+    const data = await resp.json();
+    el.innerHTML = data.providers.map(p =>
+      `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
+        <span>${p.label}</span>
+        <span class="badge ${p.configured ? 'badge-green' : 'badge-red'}">${p.configured ? 'Configured' : 'Not configured'}</span>
+      </div>`).join('');
+  } catch (err) {
+    el.innerHTML = `<span style="color:var(--color-text-danger)">Could not reach backend server. Make sure "node server.js" is running.</span>`;
+  }
+}
+
+// ── UTILITIES ──────────────────────────────────────────────────────────────────
+function copyTextById(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.value||el.textContent).then(()=>{
+    const btn = event.target.closest('button');
+    const orig = btn.innerHTML;
+    btn.textContent='Copied!';
+    setTimeout(()=>btn.innerHTML=orig, 1500);
+  });
+}
+function downloadText(text, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text],{type:'text/plain'}));
+  a.download = filename; a.click();
+}
+function exportResult() {
+  const q = document.getElementById('optimized-query')?.value||'';
+  const exp = document.getElementById('opt-explanation')?.innerText||'';
+  downloadText(`QUERYMIND OPTIMIZATION REPORT\n${'='.repeat(40)}\n\nOptimized Query:\n${q}\n\nExplanation:\n${exp}`, 'optimization-report.txt');
+}
+
+renderPage('optimizer');
+</script>
+</body>
+</html>
