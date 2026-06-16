@@ -1,29 +1,73 @@
-# QueryMind Setup
+# QueryMind
+
+QueryMind is a local AI assistant for SQL and NoSQL work. It can optimize queries, explain execution plans, compare query versions, recommend indexes, generate sample data, analyze reports, and answer database questions.
+
+## API key storage
+
+QueryMind does not ship with an API key and does not store API keys in the browser.
+
+On first launch, each user chooses an AI provider and enters their own API key. The backend saves that key in the user's operating-system credential store through `keytar`. On Windows, that means Windows Credential Manager.
+
+The saved key is per Windows user account and per machine. Another laptop or another Windows user account must enter its own key.
 
 ## 1. Install dependencies
-```
+
+```bash
 npm install
 ```
-(If you don't need Oracle/TNS support, you can remove `oracledb` from package.json before installing.)
 
-## 2. Configure environment
-```
-cp .env.example .env
-```
-Edit `.env` and fill in whichever LLM keys you have (ANTHROPIC_API_KEY, OPENAI_API_KEY, KIMI_API_KEY).
-You don't need all three — the LLM dropdown will show which providers are configured.
+## 2. Optional local config
 
-For Oracle TNS connectivity, set `TNS_ADMIN` to the directory containing your `tnsnames.ora`.
+`.env` is optional. It is only used for model overrides and the local port.
 
-## 3. Run
+```bash
+copy .env.example .env
 ```
+
+Do not put API keys in `.env`.
+
+## 3. Run as a website
+
+```bash
 node server.js
 ```
-Then open http://localhost:3000/querymind.html
 
-## What changed
-- Added an LLM dropdown (Claude / OpenAI / Kimi) in the top bar.
-- Removed the browser API-key prompt entirely — `server.js` proxies all AI calls
-  using keys from `.env`, so end users never need their own key.
-- Added a "DB Connection (TNS)" page to test Oracle connections via a TNS alias
-  and run queries against company databases.
+Open:
+
+```text
+http://localhost:3000/querymind.html
+```
+
+The first time you open it, QueryMind asks for:
+
+- AI provider
+- API key
+
+## 4. Run as a desktop app
+
+```bash
+npm start
+```
+
+Electron starts the local backend and opens QueryMind.
+
+## 5. Build Windows installer
+
+```bash
+npm run build
+```
+
+The installer is created in:
+
+```text
+dist/QueryMind-Setup.exe
+```
+
+Share that installer with users. They do not need your `.env` file or your API key. After installing, each user enters their own provider key once.
+
+## Notes
+
+- `.env` is excluded from the installer.
+- The Electron window uses the normal Windows frame, so minimize, maximize, and close buttons are available.
+- The app needs internet access to call the selected AI provider.
+- The Oracle TNS connection feature has been removed for now. Paste safe schema snippets, execution plans, or query text manually into QueryMind.

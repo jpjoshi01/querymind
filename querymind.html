@@ -114,6 +114,15 @@
   .chat-bubble { display: inline-block; max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
   .chat-bubble.user { background: #185FA5; color: white; border-radius: 12px 12px 2px 12px; }
   .chat-bubble.ai { background: var(--color-background-secondary); color: var(--color-text-primary); border-radius: 12px 12px 12px 2px; text-align: left; }
+  .setup-backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,0.42); display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .setup-dialog { width: min(460px, 100%); background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 20px; box-shadow: 0 18px 50px rgba(0,0,0,0.25); }
+  .setup-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .setup-copy { font-size: 13px; line-height: 1.55; color: var(--color-text-secondary); margin-bottom: 14px; }
+  .setup-field { margin-bottom: 12px; }
+  .setup-field label { display: block; font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+  .setup-field select, .setup-field input { width: 100%; }
+  .setup-error { min-height: 18px; font-size: 12px; color: var(--color-text-danger); margin-bottom: 10px; }
+  .setup-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
   .hidden { display: none !important; }
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -153,7 +162,6 @@
     <div class="nav-section">
       <div class="nav-label">Insights</div>
       <button class="nav-item" onclick="navigate('dashboard')"><i class="ti ti-layout-dashboard"></i><span>Dashboard</span></button>
-      <button class="nav-item" onclick="navigate('dbconn')"><i class="ti ti-plug-connected"></i><span>DB Connection (TNS)</span></button>
     </div>
   </div>
 </div>
@@ -168,10 +176,9 @@
         <option>MongoDB</option><option>Cassandra</option><option>Redis</option><option>Elasticsearch</option>
       </select>
       <select id="llm-select" onchange="updateLLM()" title="Choose AI model">
-        <option value="claude">Claude</option>
-        <option value="openai">OpenAI</option>
-        <option value="kimi">Kimi</option>
+        <option value="">Checking AI providers...</option>
       </select>
+      <button class="btn btn-sm" onclick="showApiKeySetup(false)" title="Add or change API key"><i class="ti ti-key"></i> API Key</button>
       <span class="badge badge-blue" id="mode-badge">SQL</span>
     </div>
   </div>
@@ -179,19 +186,52 @@
 </div>
 </div>
 
+<div class="setup-backdrop hidden" id="api-key-modal">
+  <div class="setup-dialog">
+    <div class="setup-title">Set up your AI provider</div>
+    <div class="setup-copy">
+      Enter your own API key once on this machine. QueryMind stores it in Windows Credential Manager, not in the browser and not in this project folder.
+    </div>
+    <div class="setup-field">
+      <label for="setup-provider">AI provider</label>
+      <select id="setup-provider">
+        <option value="openai">OpenAI (GPT)</option>
+        <option value="claude">Claude (Anthropic)</option>
+        <option value="kimi">Kimi (Moonshot AI)</option>
+      </select>
+    </div>
+    <div class="setup-field">
+      <label for="setup-api-key">API key</label>
+      <input type="password" id="setup-api-key" placeholder="Paste your API key" autocomplete="off">
+    </div>
+    <div class="setup-error" id="setup-error"></div>
+    <div class="setup-actions">
+      <button class="btn btn-sm" id="setup-remove-btn" onclick="removeSelectedProviderKey()"><i class="ti ti-trash"></i> Remove Saved Key</button>
+      <button class="btn btn-sm" id="setup-cancel-btn" onclick="hideApiKeySetup()"><i class="ti ti-x"></i> Cancel</button>
+      <button class="btn btn-primary" onclick="saveApiKey()"><i class="ti ti-device-floppy"></i> Save Key</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
-// All AI calls go through the local backend server (server.js), which holds
-// the API keys for Claude / OpenAI / Kimi in a .env file. No key is ever
-// entered or stored in the browser.
+// All AI calls go through the local backend server (server.js). API keys are
+// saved in the OS credential store and are never stored in the browser.
 const CHAT_API = "/api/chat";
 
-let currentLLM = "claude";
+let currentLLM = "";
 let currentPage = "optimizer";
 let analysisHistory = [];
 let chatHistory = [];
+let configuredProviderData = [];
+let setupRequired = false;
 
 const noSqlDbs = ["MongoDB","Cassandra","Redis","Elasticsearch"];
+const providerLabels = {
+  openai: "OpenAI (GPT)",
+  claude: "Claude (Anthropic)",
+  kimi: "Kimi (Moonshot AI)"
+};
 
 function updateDB() {
   const db = document.getElementById("db-select").value;
@@ -204,10 +244,107 @@ function updateLLM() {
   currentLLM = document.getElementById("llm-select").value;
 }
 
+async function loadConfiguredProviders() {
+  const select = document.getElementById("llm-select");
+  try {
+    const resp = await fetch("/api/providers");
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "Could not load providers");
+
+    configuredProviderData = data.providers || [];
+    const providers = (data.providers || []).filter(provider => provider.configured);
+    if (!providers.length) {
+      select.innerHTML = '<option value="">No AI provider configured</option>';
+      select.disabled = true;
+      currentLLM = "";
+      showApiKeySetup(true);
+      return;
+    }
+
+    select.disabled = false;
+    select.innerHTML = providers
+      .map(provider => `<option value="${provider.id}">${provider.label}</option>`)
+      .join("");
+    currentLLM = data.defaultProvider || providers[0].id;
+    select.value = currentLLM;
+    if (currentLLM) document.getElementById("setup-provider").value = currentLLM;
+    hideApiKeySetup();
+  } catch (err) {
+    select.innerHTML = '<option value="">Backend unavailable</option>';
+    select.disabled = true;
+    currentLLM = "";
+    document.getElementById("setup-error").textContent = err.message;
+    showApiKeySetup(true);
+  }
+}
+
+function showApiKeySetup(required = false) {
+  setupRequired = required;
+  document.getElementById("api-key-modal").classList.remove("hidden");
+  document.getElementById("setup-cancel-btn").classList.toggle("hidden", required);
+  document.getElementById("setup-remove-btn").classList.toggle("hidden", required);
+  document.getElementById("setup-api-key").value = "";
+  if (currentLLM) document.getElementById("setup-provider").value = currentLLM;
+  setTimeout(() => document.getElementById("setup-api-key").focus(), 50);
+}
+
+function hideApiKeySetup() {
+  if (setupRequired && !currentLLM) return;
+  document.getElementById("api-key-modal").classList.add("hidden");
+  document.getElementById("setup-error").textContent = "";
+}
+
+async function saveApiKey() {
+  const provider = document.getElementById("setup-provider").value;
+  const apiKey = document.getElementById("setup-api-key").value.trim();
+  const errEl = document.getElementById("setup-error");
+  errEl.textContent = "";
+
+  if (!apiKey) {
+    errEl.textContent = "Enter an API key first.";
+    return;
+  }
+
+  try {
+    const resp = await fetch("/api/credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider, apiKey })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "Could not save API key");
+
+    currentLLM = provider;
+    setupRequired = false;
+    await loadConfiguredProviders();
+    document.getElementById("llm-select").value = provider;
+    updateLLM();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+async function removeSelectedProviderKey() {
+  const provider = document.getElementById("setup-provider").value;
+  const errEl = document.getElementById("setup-error");
+  errEl.textContent = "";
+
+  if (!confirm(`Remove the saved ${providerLabels[provider]} API key from this machine?`)) return;
+
+  try {
+    const resp = await fetch(`/api/credentials/${provider}`, { method: "DELETE" });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "Could not remove API key");
+    await loadConfiguredProviders();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
 function navigate(page) {
   currentPage = page;
   document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
-  const titles = { optimizer:"Query Optimizer", explain:"Explain Plan Analysis", awr:"AWR & Performance Reports", compare:"Compare Queries", index:"Index Advisor", datagen:"Data Generator", nl:"NL Assistant", dashboard:"Dashboard", dbconn:"Database Connection (TNS)" };
+  const titles = { optimizer:"Query Optimizer", explain:"Explain Plan Analysis", awr:"AWR & Performance Reports", compare:"Compare Queries", index:"Index Advisor", datagen:"Data Generator", nl:"NL Assistant", dashboard:"Dashboard" };
   document.getElementById("page-title").textContent = titles[page] || page;
   event && event.currentTarget && event.currentTarget.classList.add("active");
   renderPage(page);
@@ -215,11 +352,15 @@ function navigate(page) {
 
 function renderPage(page) {
   const c = document.getElementById("main-content");
-  const pages = { optimizer:renderOptimizer, explain:renderExplain, awr:renderAWR, compare:renderCompare, index:renderIndex, datagen:renderDatagen, nl:renderNL, dashboard:renderDashboard, dbconn:renderDBConn };
+  const pages = { optimizer:renderOptimizer, explain:renderExplain, awr:renderAWR, compare:renderCompare, index:renderIndex, datagen:renderDatagen, nl:renderNL, dashboard:renderDashboard };
   if (pages[page]) pages[page](c);
 }
 
 async function callAI(systemPrompt, userPrompt) {
+  if (!currentLLM) {
+    throw new Error("No AI provider is configured. Add your API key with the API Key button.");
+  }
+
   const resp = await fetch(CHAT_API, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -234,112 +375,6 @@ async function callAI(systemPrompt, userPrompt) {
   const data = await resp.json();
   if (!resp.ok) throw new Error(data.error || "API error " + resp.status);
   return data.text;
-}
-
-// ── DATABASE CONNECTION (TNS) ────────────────────────────────────────────────
-function renderDBConn(c) {
-  c.innerHTML = `
-  <div class="card">
-    <div class="card-title"><i class="ti ti-plug-connected"></i> Oracle TNS Connection</div>
-    <p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">
-      Connect to a company Oracle database using a TNS alias defined in <code>tnsnames.ora</code>
-      (the server reads this from the <code>TNS_ADMIN</code> path configured in <code>.env</code>).
-      Credentials are sent to your local server only and are not stored.
-    </p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-      <div>
-        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px">TNS Alias</label>
-        <select id="tns-alias" style="width:100%"><option value="">Loading...</option></select>
-      </div>
-      <div>
-        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px">&nbsp;</label>
-        <button class="btn btn-sm" onclick="loadTNSEntries()"><i class="ti ti-refresh"></i> Refresh TNS list</button>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-      <div>
-        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px">Username</label>
-        <input type="text" id="tns-user" style="width:100%" placeholder="db username">
-      </div>
-      <div>
-        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px">Password</label>
-        <input type="password" id="tns-password" style="width:100%" placeholder="db password">
-      </div>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-primary" onclick="testTNSConnection()"><i class="ti ti-plug"></i> Test Connection</button>
-    </div>
-    <div id="tns-status" style="margin-top:12px;font-size:13px"></div>
-  </div>
-
-  <div class="card">
-    <div class="card-title"><i class="ti ti-code"></i> Run a Query Against Connected DB</div>
-    <p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px">Use this to pull real schema or sample rows, then paste into the Optimizer or Data Generator.</p>
-    <textarea class="code-editor" id="tns-sql" placeholder="SELECT * FROM dual" style="min-height:80px"></textarea>
-    <button class="btn btn-primary" style="margin-top:10px" onclick="runTNSQuery()"><i class="ti ti-player-play"></i> Run Query</button>
-    <div id="tns-query-results" style="margin-top:12px"></div>
-  </div>`;
-
-  loadTNSEntries();
-}
-
-async function loadTNSEntries() {
-  const sel = document.getElementById('tns-alias');
-  sel.innerHTML = '<option value="">Loading...</option>';
-  try {
-    const resp = await fetch('/api/db/tns-entries');
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || 'Failed to load TNS entries');
-    sel.innerHTML = data.aliases.length
-      ? data.aliases.map(a => `<option value="${a}">${a}</option>`).join('')
-      : '<option value="">No entries found in tnsnames.ora</option>';
-  } catch (err) {
-    sel.innerHTML = '<option value="">Unavailable</option>';
-    document.getElementById('tns-status').innerHTML = `<span style="color:var(--color-text-danger)">Could not load TNS entries: ${err.message}</span>`;
-  }
-}
-
-async function testTNSConnection() {
-  const tnsAlias = document.getElementById('tns-alias').value;
-  const user = document.getElementById('tns-user').value;
-  const password = document.getElementById('tns-password').value;
-  const status = document.getElementById('tns-status');
-  if (!tnsAlias || !user || !password) { status.innerHTML = '<span style="color:var(--color-text-danger)">Please fill in alias, username, and password.</span>'; return; }
-  status.innerHTML = '<div class="spinner" style="width:14px;height:14px"></div> Connecting...';
-  try {
-    const resp = await fetch('/api/db/connect', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ tnsAlias, user, password })
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error);
-    status.innerHTML = `<span style="color:var(--color-text-success)"><i class="ti ti-check"></i> ${data.message}</span>`;
-  } catch (err) {
-    status.innerHTML = `<span style="color:var(--color-text-danger)"><i class="ti ti-x"></i> ${err.message}</span>`;
-  }
-}
-
-async function runTNSQuery() {
-  const tnsAlias = document.getElementById('tns-alias').value;
-  const user = document.getElementById('tns-user').value;
-  const password = document.getElementById('tns-password').value;
-  const sql = document.getElementById('tns-sql').value.trim();
-  const out = document.getElementById('tns-query-results');
-  if (!tnsAlias || !user || !password || !sql) { out.innerHTML = '<span style="color:var(--color-text-danger)">Fill in connection details and a SQL query.</span>'; return; }
-  out.innerHTML = '<div class="spinner" style="width:14px;height:14px"></div> Running...';
-  try {
-    const resp = await fetch('/api/db/query', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ tnsAlias, user, password, sql })
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error);
-    const cols = (data.metaData||[]).map(m=>m.name);
-    out.innerHTML = `<textarea class="code-editor" readonly style="min-height:160px">${JSON.stringify(data.rows, null, 2)}</textarea>
-      <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">Columns: ${cols.join(', ')}</div>`;
-  } catch (err) {
-    out.innerHTML = `<span style="color:var(--color-text-danger)">${err.message}</span>`;
-  }
 }
 
 // ── OPTIMIZER ─────────────────────────────────────────────────────────────────
@@ -793,7 +828,7 @@ function renderDashboard(c) {
   </div>
   <div class="card">
     <div class="card-title"><i class="ti ti-key"></i> AI Provider Status</div>
-    <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">API keys are configured server-side via a <code>.env</code> file — users never enter keys. Status of each provider:</p>
+    <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">API keys are saved per Windows user in Credential Manager. They are not stored in the browser or bundled with the app. Status of each provider:</p>
     <div id="provider-status" style="font-size:13px">Checking...</div>
   </div>`;
   loadProviderStatus();
@@ -835,6 +870,7 @@ function exportResult() {
   downloadText(`QUERYMIND OPTIMIZATION REPORT\n${'='.repeat(40)}\n\nOptimized Query:\n${q}\n\nExplanation:\n${exp}`, 'optimization-report.txt');
 }
 
+loadConfiguredProviders();
 renderPage('optimizer');
 </script>
 </body>

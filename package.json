@@ -11,7 +11,7 @@
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "oracledb": "^6.5.1"
+    "keytar": "^7.9.0"
   },
   "devDependencies": {
     "electron": "^38.0.0",
@@ -25,7 +25,14 @@
     },
     "files": [
       "**/*",
-      "!dist/*"
+      "!dist/*",
+      "!.env",
+      "!.env.*",
+      "!.git/**",
+      "!node_modules/.cache/**"
+    ],
+    "asarUnpack": [
+      "node_modules/keytar/**/*"
     ],
     "win": {
       "target": "nsis",

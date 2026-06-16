@@ -1,9 +1,8 @@
 const { app, BrowserWindow } = require("electron");
-const { spawn } = require("child_process");
 const path = require("path");
 
 let mainWindow;
-let serverProcess;
+let backend;
 
 function createWindow() {
 
@@ -31,33 +30,22 @@ app.whenReady().then(() => {
 
     console.log("Starting QueryMind backend...");
 
-    serverProcess = spawn("node", ["server.js"], {
-        cwd: __dirname,
-        shell: true
-    });
-
-    serverProcess.stdout.on("data", data => {
-        console.log(data.toString());
-    });
-
-    serverProcess.stderr.on("data", data => {
-        console.error(data.toString());
-    });
-
-    serverProcess.on("error", err => {
+    try {
+        backend = require(path.join(__dirname, "server.js"));
+    } catch (err) {
         console.error("Server startup error:", err);
-    });
+    }
 
     setTimeout(() => {
         createWindow();
-    }, 4000);
+    }, 1500);
 
 });
 
 app.on("window-all-closed", () => {
 
-    if (serverProcess) {
-        serverProcess.kill();
+    if (backend?.server) {
+        backend.server.close();
     }
 
     app.quit();
@@ -65,8 +53,8 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
 
-    if (serverProcess) {
-        serverProcess.kill();
+    if (backend?.server) {
+        backend.server.close();
     }
 
 });
